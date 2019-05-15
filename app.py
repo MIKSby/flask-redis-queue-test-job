@@ -37,9 +37,17 @@ class JobsAPI(Resource):
             return output_json({'status': 'error',
                                 'description': 'Wrong request!'}, 400)
 
+    def delete(self, job_id):
+        if self.redis.exists(job_id):
+            self.redis.delete(job_id)
+            return output_json({'status': 'ok',
+                                'description': 'Job is deleted.'}, 200)
+        else:
+            return output_json({'status': 'error',
+                                'description': 'The job is not in the queue.'}, 200)
 
-api.add_resource(JobsAPI, '/jobs')
 
+api.add_resource(JobsAPI, '/jobs', '/jobs/<string:job_id>')
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
