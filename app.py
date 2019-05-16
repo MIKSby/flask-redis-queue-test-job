@@ -15,8 +15,8 @@ class JobsAPI(Resource):
                             decode_responses=True)
 
     def get(self):
-        return {'status': 'ok',
-                'jobs': [i for i in self.redis.keys()]}
+        return output_json({'status': 'ok',
+                            'jobs': [i for i in self.redis.keys()]}, 200)
 
     def post(self):
         if isinstance(request.json, list) and request.json:
