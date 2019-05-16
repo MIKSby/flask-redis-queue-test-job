@@ -19,7 +19,7 @@ class JobsAPI(Resource):
                 'jobs': [i for i in self.redis.keys()]}
 
     def post(self):
-        if isinstance(request.json, list):
+        if isinstance(request.json, list) and request.json:
             job_id = str(uuid.uuid4())
 
             data = {
