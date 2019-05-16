@@ -23,10 +23,8 @@ class JobsAPI(Resource):
             job_id = str(uuid.uuid4())
 
             data = {
-                job_id: {
-                    'items': request.json,
-                    'done': []
-                }
+                'items': request.json,
+                'done': []
             }
 
             if self.redis.jsonset(job_id, Path.rootPath(), data):
