@@ -126,7 +126,7 @@ class JobsAPI(Resource):
                                 'description': 'Job is deleted.'}, 200)
         else:
             return output_json({'status': 'error',
-                                'description': 'The job is not in the queue.'}, 200)
+                                'description': 'The job is not in the queue.'}, 400)
 
 
 api.add_resource(JobsAPI,
