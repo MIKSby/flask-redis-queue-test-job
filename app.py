@@ -25,13 +25,15 @@ class JobsAPI(Resource):
                     args = parser.parse_args(strict=True)
                     if self.redis.jsonget(job_id, Path('.items')):
                         ttl = args.get('expired_duration')
-                        for item in self.redis.jsonget(job_id, Path('.items')):
+                        items = self.redis.jsonget(job_id, Path('.items'))
+                        for item in items:
                             if not self.redis.exists(f'hold_{item}'):
                                 self.redis.execute_command('SET', f'hold_{item}', job_id)
                                 self.redis.execute_command('EXPIRE', f'hold_{item}', ttl)
                                 return output_json({'status': 'ok',
                                                     'job_id': job_id,
                                                     'ttl': ttl,
+                                                    'index': items.index(item),
                                                     'item': item}, 200)
                     return output_json({'status': 'error',
                                         'job_id': job_id,
