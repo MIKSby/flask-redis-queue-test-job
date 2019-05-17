@@ -84,12 +84,31 @@ class JobsAPI(Resource):
                                 'index': item_index,
                                 'item': done_item}, 200)
 
+        if request.url_rule.rule == '/jobs/<string:job_id>/items/<int:item_index>/error':
+            job_id = kwargs.get('job_id')
+            item_index = kwargs.get('item_index')
+            error_item = self.redis.jsonget(job_id, Path('.items'))[item_index]
+            if item_index in self.redis.jsonget(job_id, Path('.error')):
+                return output_json({'status': 'error',
+                                    'description': 'The item already was marked as error.',
+                                    'job_id': job_id,
+                                    'index': item_index,
+                                    'item': error_item}, 400)
+            self.redis.delete(f'hold_{error_item}')
+            self.redis.jsonarrappend(job_id, Path('.error'), item_index)
+            return output_json({'status': 'ok',
+                                'description': 'The item is marked as error.',
+                                'job_id': job_id,
+                                'index': item_index,
+                                'item': error_item}, 200)
+
         if isinstance(request.json, list) and request.json:
             job_id = str(uuid.uuid4())
 
             data = {
                 'items': request.json,
-                'done': []
+                'done': [],
+                'error': []
             }
 
             if self.redis.jsonset(job_id, Path.rootPath(), data):
@@ -115,7 +134,8 @@ api.add_resource(JobsAPI,
                  '/jobs/<string:job_id>',
                  '/jobs/<string:job_id>/next',
                  '/jobs/<string:job_id>/items',
-                 '/jobs/<string:job_id>/items/<int:item_index>/done')
+                 '/jobs/<string:job_id>/items/<int:item_index>/done',
+                 '/jobs/<string:job_id>/items/<int:item_index>/error')
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
