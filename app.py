@@ -21,45 +21,46 @@ class JobsAPI(Resource):
                 parser = reqparse.RequestParser()
 
                 if request.url_rule.rule == '/jobs/<string:job_id>/next':
+                    parser.add_argument('expired_duration', type=int, default=300)
+                    args = parser.parse_args(strict=True)
                     if self.redis.jsonget(job_id, Path('.items')):
-                        item = self.redis.jsonarrpop(job_id, Path('.items'))
-                        return output_json({'status': 'ok',
-                                            'job_id': job_id,
-                                            'item': item}, 200)
-                    self.redis.delete(job_id)
+                        ttl = args.get('expired_duration')
+                        for item in self.redis.jsonget(job_id, Path('.items')):
+                            if not self.redis.exists(f'hold_{item}'):
+                                self.redis.execute_command('SET', f'hold_{item}', job_id)
+                                self.redis.execute_command('EXPIRE', f'hold_{item}', ttl)
+                                return output_json({'status': 'ok',
+                                                    'job_id': job_id,
+                                                    'ttl': ttl,
+                                                    'item': item}, 200)
                     return output_json({'status': 'error',
                                         'job_id': job_id,
-                                        'description': 'The items list is empty.'
-                                                       'Job will be removed.'}, 400)
+                                        'description': 'Items list is empty.'}, 400)
 
                 if request.url_rule.rule == '/jobs/<string:job_id>/items':
-                    parser.add_argument('active',
-                                        default='true',
+                    parser.add_argument('active', default='true',
                                         choices=('true', 'false'))
                     args = parser.parse_args(strict=True)
-
+                    items = self.redis.jsonget(job_id, Path('.items'))
                     if args.get('active') == 'true':
-                        items = self.redis.jsonget(job_id, Path('.items'))
-                        if not items:
-                            self.redis.delete(job_id)
-                            return output_json({'status': 'error',
-                                                'job_id': job_id,
-                                                'description': 'The items list is empty.'
-                                                               'Job will be removed.'}, 400)
+                        active_items = []
+                        for item in items:
+                            if not self.redis.exists(f'hold_{item}'):
+                                active_items.append(item)
                         return output_json({'status': 'ok',
                                             'job_id': job_id,
-                                            'items': items}, 200)
-                    items = self.redis.jsonget(job_id, Path('.done'))
+                                            'items': active_items}, 200)
+                    done_items = self.redis.jsonget(job_id, Path('.done'))
                     return output_json({'status': 'ok',
                                         'job_id': job_id,
-                                        'items': items}, 200)
+                                        'items': items + done_items}, 200)
             else:
                 return output_json({'status': 'error',
                                     'job_id': job_id,
                                     'description': 'The job is not in the queue.'}, 400)
 
         return output_json({'status': 'ok',
-                            'jobs': [i for i in self.redis.keys()]}, 200)
+                            'jobs': [i for i in self.redis.keys() if i[:5] != 'hold_']}, 200)
 
     def post(self):
         if isinstance(request.json, list) and request.json:
